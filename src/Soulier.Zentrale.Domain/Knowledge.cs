@@ -82,6 +82,7 @@ public sealed record DocumentVersion(
 public sealed record KnowledgeRelease(
     Guid Id,
     Guid DocumentVersionId,
+    string DocumentContentHash,
     Guid ClientId,
     string ResourceScope,
     string UseCaseKey,
@@ -102,6 +103,9 @@ public static class KnowledgeReleasePolicy
     {
         if (version.Id != release.DocumentVersionId)
             return AuthorizationResult.Deny("RELEASE_VERSION_MISMATCH");
+
+        if (!string.Equals(version.ContentHash, release.DocumentContentHash, StringComparison.Ordinal))
+            return AuthorizationResult.Deny("RELEASE_HASH_MISMATCH");
 
         if (!version.IsEligibleForRelease)
             return AuthorizationResult.Deny("DOCUMENT_REVIEW_REQUIRED");
