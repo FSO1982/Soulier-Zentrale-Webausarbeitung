@@ -1,5 +1,6 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Soulier.Zentrale.Domain;
 using Soulier.Zentrale.Infrastructure;
 
 namespace Soulier.Zentrale.Persistence.Tests;
@@ -103,6 +104,66 @@ public sealed class PostgresPersistenceTests
                 ('99999999-9999-9999-9999-999999999999', '44444444-4444-4444-4444-444444444444', '', '11111111-1111-1111-1111-111111111111',
                  'soulier:test', 'codex-pilot-invalid-hash', 1, '2026-09-06T00:07:00+00:00', null, '2026-09-06T00:07:00+00:00')
                 """, cancellationToken));
+
+        var writer = new EfAuditEventWriter(db);
+        var writerEvent = AuditEvent.Create(
+            new DateTimeOffset(2026, 9, 6, 0, 8, 0, TimeSpan.Zero),
+            "corr-writer-001",
+            null,
+            Guid.Parse("11111111-1111-1111-1111-111111111111"),
+            null,
+            "knowledge.read",
+            "document_version",
+            "document-version:44444444-4444-4444-4444-444444444444",
+            Guid.Parse("44444444-4444-4444-4444-444444444444"),
+            "sha256:test",
+            "policy:test",
+            null,
+            "ALLOW",
+            "ALLOW",
+            "knowledge",
+            9);
+
+        await writer.WriteAsync(writerEvent, cancellationToken);
+        Assert.True(await ScalarBoolAsync(connection,
+            "select exists (select 1 from audit.event where \"CorrelationId\" = 'corr-writer-001')",
+            cancellationToken));
+
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
+            await ExecuteAsync(connection,
+                "update audit.event set \"ReasonCode\" = 'tampered' where \"Id\" = '66666666-6666-6666-6666-666666666666'",
+                cancellationToken));
+
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
+            await ExecuteAsync(connection,
+                "delete from audit.event where \"Id\" = '66666666-6666-6666-6666-666666666666'",
+                cancellationToken));
+
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
+            await ExecuteAsync(connection, "truncate table audit.event", cancellationToken));
+
+        var trackedAuditEvent = AuditEvent.Create(
+            new DateTimeOffset(2026, 9, 6, 0, 9, 0, TimeSpan.Zero),
+            "corr-ef-guard-001",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "DENY",
+            "TEST",
+            null,
+            null);
+
+        db.AuditEvents.Attach(trackedAuditEvent);
+        db.Entry(trackedAuditEvent).State = EntityState.Modified;
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            db.SaveChangesAsync(TestContext.Current.CancellationToken));
     }
 
     private static async Task<int> ExecuteAsync(DbConnection connection, string sql, CancellationToken cancellationToken)
