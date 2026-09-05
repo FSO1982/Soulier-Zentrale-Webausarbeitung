@@ -12,6 +12,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Soulier.Zentrale.Application/Soulier.Zentrale.Application.csproj" />
     <ProjectReference Include="../../src/Soulier.Zentrale.Domain/Soulier.Zentrale.Domain.csproj" />
   </ItemGroup>
 </Project>
