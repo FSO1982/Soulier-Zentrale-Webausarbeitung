@@ -29,6 +29,8 @@ public sealed class PostgresPersistenceTests
             "select to_regclass('audit.event') is not null", cancellationToken));
         Assert.True(await ScalarBoolAsync(connection,
             "select exists (select 1 from pg_indexes where schemaname = 'knowledge' and tablename = 'release' and indexname = 'IX_release_DocumentVersionId')", cancellationToken));
+        Assert.True(await ScalarBoolAsync(connection,
+            "select exists (select 1 from information_schema.columns where table_schema = 'knowledge' and table_name = 'release' and column_name = 'DocumentContentHash')", cancellationToken));
 
         await ExecuteAsync(connection, """
             insert into clients.client ("Id", "Name", "Environment", "Status")
@@ -56,9 +58,9 @@ public sealed class PostgresPersistenceTests
 
         await ExecuteAsync(connection, """
             insert into knowledge.release
-            ("Id", "DocumentVersionId", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
+            ("Id", "DocumentVersionId", "DocumentContentHash", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
             values
-            ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111',
+            ('55555555-5555-5555-5555-555555555555', '44444444-4444-4444-4444-444444444444', 'sha256:test', '11111111-1111-1111-1111-111111111111',
              'soulier:test', 'codex-pilot', 1, '2026-09-06T00:03:00+00:00', '2026-09-07T00:03:00+00:00', '2026-09-06T00:03:00+00:00')
             """, cancellationToken);
 
@@ -70,7 +72,7 @@ public sealed class PostgresPersistenceTests
             values
             ('66666666-6666-6666-6666-666666666666', '2026-09-06T00:04:00+00:00', 'corr-gate3-001', null,
              '11111111-1111-1111-1111-111111111111', null, 'knowledge.read', 'document_version',
-             '44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444', 'sha256:test', 'policy:test', null,
+             '44444444-4444-4444-4444-444444444444', 'sha256:test', 'policy:test', null,
              'ALLOW', 'ALLOW', 'knowledge', 12)
             """, cancellationToken);
 
@@ -87,10 +89,19 @@ public sealed class PostgresPersistenceTests
         await Assert.ThrowsAnyAsync<DbException>(async () =>
             await ExecuteAsync(connection, """
                 insert into knowledge.release
-                ("Id", "DocumentVersionId", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
+                ("Id", "DocumentVersionId", "DocumentContentHash", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
                 values
-                ('88888888-8888-8888-8888-888888888888', '44444444-4444-4444-4444-444444444444', '11111111-1111-1111-1111-111111111111',
+                ('88888888-8888-8888-8888-888888888888', '44444444-4444-4444-4444-444444444444', 'sha256:test', '11111111-1111-1111-1111-111111111111',
                  'soulier:test', 'codex-pilot-invalid', 1, '2026-09-07T00:00:00+00:00', '2026-09-06T00:00:00+00:00', '2026-09-06T00:06:00+00:00')
+                """, cancellationToken));
+
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
+            await ExecuteAsync(connection, """
+                insert into knowledge.release
+                ("Id", "DocumentVersionId", "DocumentContentHash", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
+                values
+                ('99999999-9999-9999-9999-999999999999', '44444444-4444-4444-4444-444444444444', '', '11111111-1111-1111-1111-111111111111',
+                 'soulier:test', 'codex-pilot-invalid-hash', 1, '2026-09-06T00:07:00+00:00', null, '2026-09-06T00:07:00+00:00')
                 """, cancellationToken));
     }
 
