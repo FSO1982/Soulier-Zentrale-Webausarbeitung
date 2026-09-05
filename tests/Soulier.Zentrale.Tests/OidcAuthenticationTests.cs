@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -142,6 +141,9 @@ public sealed class OidcAuthenticationTests
                     };
                     configuration.SigningKeys.Add(SigningKey);
                     options.Configuration = configuration;
+                    options.TokenValidationParameters.ValidIssuer = SoulierAuthentication.TestingAuthority;
+                    options.TokenValidationParameters.ValidAudience = SoulierAuthentication.TestingAudience;
+                    options.TokenValidationParameters.IssuerSigningKey = SigningKey;
                 });
             });
         }
