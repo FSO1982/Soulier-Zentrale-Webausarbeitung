@@ -155,6 +155,7 @@ public sealed class InitialPersistence : Migration
             {
                 Id = table.Column<Guid>(type: "uuid", nullable: false),
                 DocumentVersionId = table.Column<Guid>(type: "uuid", nullable: false),
+                DocumentContentHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                 ClientId = table.Column<Guid>(type: "uuid", nullable: false),
                 ResourceScope = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                 UseCaseKey = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
@@ -168,6 +169,7 @@ public sealed class InitialPersistence : Migration
                 table.PrimaryKey("PK_release", x => x.Id);
                 table.CheckConstraint("CK_release_status", "\"Status\" IN (0, 1, 2)");
                 table.CheckConstraint("CK_release_window", "\"ValidUntilUtc\" IS NULL OR \"ValidUntilUtc\" > \"ValidFromUtc\"");
+                table.CheckConstraint("CK_release_hash_nonempty", "length(btrim(\"DocumentContentHash\")) > 0");
                 table.CheckConstraint("CK_release_scope_nonempty", "length(btrim(\"ResourceScope\")) > 0");
                 table.CheckConstraint("CK_release_use_case_nonempty", "length(btrim(\"UseCaseKey\")) > 0");
                 table.ForeignKey(
