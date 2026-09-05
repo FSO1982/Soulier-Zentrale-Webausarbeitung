@@ -8,6 +8,10 @@ using Soulier.Zentrale.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var oidcOptions = SoulierAuthentication.ResolveOptions(builder.Configuration, builder.Environment);
+if (oidcOptions is not null)
+    builder.Services.AddSoulierOidcAuthentication(oidcOptions);
+
 var isTesting = builder.Environment.IsEnvironment("Testing");
 var developmentPilotEnabled =
     builder.Environment.IsDevelopment() &&
@@ -48,6 +52,12 @@ if (mcpPilotEnabled)
 
 var app = builder.Build();
 
+if (oidcOptions is not null)
+{
+    app.UseAuthentication();
+    app.UseAuthorization();
+}
+
 app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
@@ -77,6 +87,13 @@ if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
             ? Results.Ok(new { allowed = true, reasonCode = result.ReasonCode })
             : Results.Json(new { allowed = false, reasonCode = result.ReasonCode }, statusCode: StatusCodes.Status403Forbidden);
     });
+
+    if (oidcOptions is not null)
+    {
+        app.MapGet("/internal/identity/whoami", (System.Security.Claims.ClaimsPrincipal principal) =>
+            Results.Ok(OidcIdentityDescriptor.FromPrincipal(principal)))
+            .RequireAuthorization(SoulierAuthentication.HumanPolicy);
+    }
 }
 
 if (mcpPilotEnabled)
