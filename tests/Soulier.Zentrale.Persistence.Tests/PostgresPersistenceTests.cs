@@ -74,7 +74,7 @@ public sealed class PostgresPersistenceTests
              'ALLOW', 'ALLOW', 'knowledge', 12)
             """, cancellationToken);
 
-        await Assert.ThrowsAsync<DbException>(async () =>
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
             await ExecuteAsync(connection, """
                 insert into knowledge.document_version
                 ("Id", "DocumentId", "VersionNumber", "ContentHash", "StorageProvider", "StorageKey", "MimeType", "SizeBytes",
@@ -84,7 +84,7 @@ public sealed class PostgresPersistenceTests
                  'knowledge/invalid.txt', 'text/plain', 1, 1, 1, 1, 1, '2026-09-06T00:05:00+00:00', null)
                 """, cancellationToken));
 
-        await Assert.ThrowsAsync<DbException>(async () =>
+        await Assert.ThrowsAnyAsync<DbException>(async () =>
             await ExecuteAsync(connection, """
                 insert into knowledge.release
                 ("Id", "DocumentVersionId", "ClientId", "ResourceScope", "UseCaseKey", "Status", "ValidFromUtc", "ValidUntilUtc", "CreatedAtUtc")
