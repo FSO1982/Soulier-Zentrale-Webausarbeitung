@@ -8,6 +8,7 @@ public sealed class KnowledgeReleasePolicyTests
     private static readonly Guid DocumentId = Guid.Parse("22222222-2222-2222-2222-222222222222");
     private static readonly Guid VersionId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid ClientId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+    private const string ContentHash = "sha256:test";
 
     [Fact]
     public void New_version_starts_without_review_approval()
@@ -51,6 +52,17 @@ public sealed class KnowledgeReleasePolicyTests
     }
 
     [Fact]
+    public void Release_is_bound_to_exact_content_hash()
+    {
+        var version = ApprovedVersion(AiPolicy.LocalOnly);
+        var release = ActiveRelease() with { DocumentContentHash = "sha256:changed" };
+        var result = KnowledgeReleasePolicy.CanRelease(version, release, Now);
+
+        Assert.False(result.Allowed);
+        Assert.Equal("RELEASE_HASH_MISMATCH", result.ReasonCode);
+    }
+
+    [Fact]
     public void Expired_release_is_denied()
     {
         var version = ApprovedVersion(AiPolicy.LocalOnly);
@@ -75,7 +87,7 @@ public sealed class KnowledgeReleasePolicyTests
             VersionId,
             DocumentId,
             1,
-            "sha256:test",
+            ContentHash,
             "test-storage",
             "knowledge/test.txt",
             "text/plain",
@@ -96,6 +108,7 @@ public sealed class KnowledgeReleasePolicyTests
         new(
             Guid.Parse("44444444-4444-4444-4444-444444444444"),
             VersionId,
+            ContentHash,
             ClientId,
             "soulier:test",
             "codex-pilot",
