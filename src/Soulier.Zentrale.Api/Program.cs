@@ -8,14 +8,19 @@ using Soulier.Zentrale.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var mcpPilotEnabled =
-    (builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing")) &&
+var isTesting = builder.Environment.IsEnvironment("Testing");
+var developmentPilotEnabled =
+    builder.Environment.IsDevelopment() &&
     builder.Configuration.GetValue<bool>("Soulier:Mcp:PilotEnabled");
+var mcpPilotEnabled = isTesting || developmentPilotEnabled;
 
 string? mcpPilotToken = null;
 if (mcpPilotEnabled)
 {
-    mcpPilotToken = builder.Configuration["Soulier:Mcp:PilotToken"];
+    mcpPilotToken = isTesting
+        ? "gate3-ci-test-token"
+        : builder.Configuration["Soulier:Mcp:PilotToken"];
+
     if (string.IsNullOrWhiteSpace(mcpPilotToken))
         throw new InvalidOperationException("Soulier MCP pilot is enabled but no pilot bearer token is configured.");
 
