@@ -7,11 +7,14 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.11" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="ModelContextProtocol" Version="2.2.0" />
     <PackageReference Include="xunit.v3" Version="3.0.1" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/Soulier.Zentrale.Api/Soulier.Zentrale.Api.csproj" />
     <ProjectReference Include="../../src/Soulier.Zentrale.Application/Soulier.Zentrale.Application.csproj" />
     <ProjectReference Include="../../src/Soulier.Zentrale.Domain/Soulier.Zentrale.Domain.csproj" />
   </ItemGroup>
