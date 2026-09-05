@@ -12,6 +12,30 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
     public DbSet<KnowledgeRelease> KnowledgeReleases => Set<KnowledgeRelease>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        EnsureAuditAppendOnly();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureAuditAppendOnly();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void EnsureAuditAppendOnly()
+    {
+        var mutationDetected = ChangeTracker
+            .Entries<AuditEvent>()
+            .Any(entry => entry.State is EntityState.Modified or EntityState.Deleted);
+
+        if (mutationDetected)
+            throw new InvalidOperationException("Audit events are append-only and cannot be modified or deleted.");
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Client>(entity =>
