@@ -72,7 +72,7 @@ public sealed class PostgresPersistenceTests
             values
             ('66666666-6666-6666-6666-666666666666', '2026-09-06T00:04:00+00:00', 'corr-gate3-001', null,
              '11111111-1111-1111-1111-111111111111', null, 'knowledge.read', 'document_version',
-             '44444444-4444-4444-4444-444444444444', 'sha256:test', 'policy:test', null,
+             'document-version:44444444-4444-4444-4444-444444444444', '44444444-4444-4444-4444-444444444444', 'sha256:test', 'policy:test', null,
              'ALLOW', 'ALLOW', 'knowledge', 12)
             """, cancellationToken);
 
