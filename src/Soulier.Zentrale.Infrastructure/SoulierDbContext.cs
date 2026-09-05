@@ -63,6 +63,7 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
         {
             entity.ToTable("release", "knowledge");
             entity.HasKey(x => x.Id);
+            entity.Property(x => x.DocumentContentHash).HasMaxLength(128).IsRequired();
             entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
             entity.Property(x => x.UseCaseKey).HasMaxLength(200).IsRequired();
             entity.HasOne<DocumentVersion>()
