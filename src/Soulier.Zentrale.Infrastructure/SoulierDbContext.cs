@@ -1,0 +1,97 @@
+using Microsoft.EntityFrameworkCore;
+using Soulier.Zentrale.Domain;
+
+namespace Soulier.Zentrale.Infrastructure;
+
+public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options) : DbContext(options)
+{
+    public DbSet<Client> Clients => Set<Client>();
+    public DbSet<KnowledgeSource> KnowledgeSources => Set<KnowledgeSource>();
+    public DbSet<KnowledgeDocument> Documents => Set<KnowledgeDocument>();
+    public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
+    public DbSet<KnowledgeRelease> KnowledgeReleases => Set<KnowledgeRelease>();
+    public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Client>(entity =>
+        {
+            entity.ToTable("client", "clients");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
+            entity.HasIndex(x => new { x.Environment, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<KnowledgeSource>(entity =>
+        {
+            entity.ToTable("source", "knowledge");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+            entity.Property(x => x.SourceType).HasMaxLength(64).IsRequired();
+        });
+
+        modelBuilder.Entity<KnowledgeDocument>(entity =>
+        {
+            entity.ToTable("document", "knowledge");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.LogicalName).HasMaxLength(500).IsRequired();
+            entity.HasOne<KnowledgeSource>()
+                .WithMany()
+                .HasForeignKey(x => x.KnowledgeSourceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.KnowledgeSourceId, x.LogicalName }).IsUnique();
+        });
+
+        modelBuilder.Entity<DocumentVersion>(entity =>
+        {
+            entity.ToTable("document_version", "knowledge");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ContentHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.StorageProvider).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.StorageKey).HasMaxLength(1000).IsRequired();
+            entity.Property(x => x.MimeType).HasMaxLength(200).IsRequired();
+            entity.HasOne<KnowledgeDocument>()
+                .WithMany()
+                .HasForeignKey(x => x.DocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.DocumentId, x.VersionNumber }).IsUnique();
+            entity.HasIndex(x => x.ContentHash);
+        });
+
+        modelBuilder.Entity<KnowledgeRelease>(entity =>
+        {
+            entity.ToTable("release", "knowledge");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.UseCaseKey).HasMaxLength(200).IsRequired();
+            entity.HasOne<DocumentVersion>()
+                .WithMany()
+                .HasForeignKey(x => x.DocumentVersionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Client>()
+                .WithMany()
+                .HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ClientId, x.ResourceScope, x.UseCaseKey, x.Status });
+        });
+
+        modelBuilder.Entity<AuditEvent>(entity =>
+        {
+            entity.ToTable("event", "audit");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.CapabilityKey).HasMaxLength(200);
+            entity.Property(x => x.ResourceType).HasMaxLength(100);
+            entity.Property(x => x.ResourceId).HasMaxLength(500);
+            entity.Property(x => x.ContentHash).HasMaxLength(128);
+            entity.Property(x => x.PolicyVersion).HasMaxLength(100);
+            entity.Property(x => x.Result).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.ReasonCode).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.SourceAdapter).HasMaxLength(100);
+            entity.HasIndex(x => x.OccurredAtUtc);
+            entity.HasIndex(x => x.CorrelationId);
+            entity.HasIndex(x => new { x.ClientId, x.OccurredAtUtc });
+        });
+    }
+}
