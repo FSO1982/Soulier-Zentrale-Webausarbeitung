@@ -59,16 +59,29 @@ public static class CapabilityAuthorizer
                 ? "APPROVAL_REQUIRED"
                 : "POLICY_DENIED");
 
-        var matchingGrant = request.Grants.Any(g =>
-            g.ClientId == request.Client.Id &&
-            g.Status == GrantStatus.Active &&
-            string.Equals(g.CapabilityKey, request.Capability.Key, StringComparison.Ordinal) &&
-            string.Equals(g.Environment, request.Client.Environment, StringComparison.Ordinal) &&
-            string.Equals(g.ResourceScope, request.RequestedScope, StringComparison.Ordinal) &&
-            g.ValidFromUtc <= request.NowUtc &&
-            (g.ValidUntilUtc is null || g.ValidUntilUtc > request.NowUtc));
+        var capabilityGrants = request.Grants
+            .Where(g =>
+                g.ClientId == request.Client.Id &&
+                g.Status == GrantStatus.Active &&
+                string.Equals(g.CapabilityKey, request.Capability.Key, StringComparison.Ordinal) &&
+                g.ValidFromUtc <= request.NowUtc &&
+                (g.ValidUntilUtc is null || g.ValidUntilUtc > request.NowUtc))
+            .ToArray();
 
-        return matchingGrant
+        if (capabilityGrants.Length == 0)
+            return AuthorizationResult.Deny("CAPABILITY_DENIED");
+
+        var environmentMatch = capabilityGrants.Any(g =>
+            string.Equals(g.Environment, request.Client.Environment, StringComparison.Ordinal));
+
+        if (!environmentMatch)
+            return AuthorizationResult.Deny("ENVIRONMENT_DENIED");
+
+        var scopeMatch = capabilityGrants.Any(g =>
+            string.Equals(g.Environment, request.Client.Environment, StringComparison.Ordinal) &&
+            string.Equals(g.ResourceScope, request.RequestedScope, StringComparison.Ordinal));
+
+        return scopeMatch
             ? AuthorizationResult.Allow()
             : AuthorizationResult.Deny("RESOURCE_SCOPE_DENIED");
     }
