@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Soulier.Zentrale.Api/Soulier.Zentrale.Api.csproj" />
+    <Project Path="src/Soulier.Zentrale.Application/Soulier.Zentrale.Application.csproj" />
+    <Project Path="src/Soulier.Zentrale.Domain/Soulier.Zentrale.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Soulier.Zentrale.Tests/Soulier.Zentrale.Tests.csproj" />
+  </Folder>
+</Solution>
