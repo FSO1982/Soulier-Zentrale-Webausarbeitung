@@ -1,0 +1,25 @@
+name: ci
+
+on:
+  push:
+    branches: [main, work/gate3-architecture-skeleton]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore
+        run: dotnet restore Soulier.Zentrale.slnx
+      - name: Build
+        run: dotnet build Soulier.Zentrale.slnx --configuration Release --no-restore
+      - name: Test
+        run: dotnet test Soulier.Zentrale.slnx --configuration Release --no-build
