@@ -1,0 +1,41 @@
+name: postgres-integration
+
+on:
+  push:
+    branches: [main, work/gate3-architecture-skeleton]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: soulier_test
+          POSTGRES_PASSWORD: soulier_test
+          POSTGRES_DB: soulier_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U soulier_test -d soulier_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SOULIER_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=soulier_test;Username=soulier_test;Password=soulier_test;Include Error Detail=true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore persistence tests
+        run: dotnet restore tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+      - name: Build persistence tests
+        run: dotnet build tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj --configuration Release --no-restore
+      - name: Run PostgreSQL integration tests
+        run: dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj --configuration Release --no-build
