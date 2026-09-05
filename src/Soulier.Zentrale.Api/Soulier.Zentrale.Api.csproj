@@ -6,6 +6,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Soulier.Zentrale.Application/Soulier.Zentrale.Application.csproj" />
     <ProjectReference Include="../Soulier.Zentrale.Domain/Soulier.Zentrale.Domain.csproj" />
   </ItemGroup>
