@@ -12,5 +12,6 @@
   <ItemGroup>
     <ProjectReference Include="../Soulier.Zentrale.Application/Soulier.Zentrale.Application.csproj" />
     <ProjectReference Include="../Soulier.Zentrale.Domain/Soulier.Zentrale.Domain.csproj" />
+    <ProjectReference Include="../Soulier.Zentrale.Infrastructure/Soulier.Zentrale.Infrastructure.csproj" />
   </ItemGroup>
 </Project>
