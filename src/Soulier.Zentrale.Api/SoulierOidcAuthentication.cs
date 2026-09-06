@@ -26,8 +26,14 @@ public static class SoulierAuthentication
         if (environment.IsEnvironment("Testing"))
             return new SoulierOidcOptions(TestingAuthority, TestingAudience);
 
-        if (!configuration.GetValue<bool>("Soulier:Identity:Oidc:Enabled"))
+        var enabled = configuration.GetValue<bool>("Soulier:Identity:Oidc:Enabled");
+        if (!enabled)
+        {
+            if (environment.IsProduction())
+                throw new InvalidOperationException("OIDC authentication is mandatory in Production.");
+
             return null;
+        }
 
         var authority = configuration["Soulier:Identity:Oidc:Authority"];
         var audience = configuration["Soulier:Identity:Oidc:Audience"];
@@ -52,7 +58,7 @@ public static class SoulierAuthentication
 
         services.TryAddSingleton<IHumanPrincipalRegistry, DenyAllHumanPrincipalRegistry>();
         services.TryAddEnumerable(
-            ServiceDescriptor.Singleton<IAuthorizationHandler, ActiveHumanEnrollmentHandler>());
+            ServiceDescriptor.Scoped<IAuthorizationHandler, ActiveHumanEnrollmentHandler>());
 
         services
             .AddAuthentication(authentication =>
