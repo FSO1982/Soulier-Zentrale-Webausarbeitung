@@ -53,6 +53,12 @@ jobs:
           --configuration Release --no-build
           --filter FullyQualifiedName~PostgresHumanAccessTests.Human_access_schema_is_persistent_unique_scoped_and_readable
 
+      - name: Seed representative AI automation and retention policy state
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresControlPlanePolicyTests.Control_plane_tables_enforce_active_version_idempotency_and_retention_constraints
+
       - name: Prepare representative content file
         shell: bash
         run: |
@@ -101,7 +107,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/soulier-content"
           tar -C "$RUNNER_TEMP/soulier-content" -xzf "$RUNNER_TEMP/soulier-content.tar.gz"
 
-      - name: Verify restored database, identity, audit protection and content hash
+      - name: Verify restored database, identity, policies, audit protection and content hash
         shell: bash
         run: |
           set -euo pipefail
@@ -119,7 +125,12 @@ jobs:
           test "$(query 'select count(*) from identity.role;')" -ge 1
           test "$(query 'select count(*) from identity.role_capability;')" -ge 1
           test "$(query 'select count(*) from identity.human_role_assignment;')" -ge 1
-          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 3
+          test "$(query 'select count(*) from ai.use_case;')" -ge 1
+          test "$(query 'select count(*) from ai.use_case_version;')" -ge 1
+          test "$(query 'select count(*) from automation.action_definition;')" -ge 1
+          test "$(query 'select count(*) from automation.action_execution;')" -ge 1
+          test "$(query 'select count(*) from policy.retention_rule;')" -ge 1
+          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 4
 
           if docker run --rm --network host \
             -e PGPASSWORD="$PGPASSWORD" \
