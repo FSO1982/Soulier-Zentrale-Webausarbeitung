@@ -37,7 +37,11 @@ public sealed class KnowledgeDependencySecurityTests
             null,
             "test");
 
-        var result = await guard.EvaluateAsync(request, auditContext, Now);
+        var result = await guard.EvaluateAsync(
+            request,
+            auditContext,
+            Now,
+            TestContext.Current.CancellationToken);
 
         Assert.False(result.Allowed);
         Assert.Equal(expectedReasonCode, result.ReasonCode);
@@ -71,7 +75,11 @@ public sealed class KnowledgeDependencySecurityTests
             null,
             "test");
 
-        var result = await guard.EvaluateAsync(request, auditContext, Now);
+        var result = await guard.EvaluateAsync(
+            request,
+            auditContext,
+            Now,
+            TestContext.Current.CancellationToken);
 
         Assert.True(result.Allowed);
         Assert.Empty(audit.Events);
