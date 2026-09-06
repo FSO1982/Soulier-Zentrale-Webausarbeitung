@@ -53,11 +53,23 @@ jobs:
           --configuration Release --no-build
           --filter FullyQualifiedName~PostgresHumanAccessTests.Human_access_schema_is_persistent_unique_scoped_and_readable
 
+      - name: Seed representative client capability and grant data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~ClientAccessAdministrationTests.Persistent_client_grant_can_be_authorized_then_revoked_without_code_change
+
       - name: Seed representative AI automation and retention policy state
         run: >-
           dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
           --configuration Release --no-build
           --filter FullyQualifiedName~PostgresControlPlanePolicyTests.Control_plane_tables_enforce_active_version_idempotency_and_retention_constraints
+
+      - name: Seed representative provider and approval state
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresProviderApprovalTests.Provider_and_approval_state_enforce_explicit_evidence_and_exact_execution_binding
 
       - name: Prepare representative content file
         shell: bash
@@ -107,7 +119,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/soulier-content"
           tar -C "$RUNNER_TEMP/soulier-content" -xzf "$RUNNER_TEMP/soulier-content.tar.gz"
 
-      - name: Verify restored database, identity, policies, audit protection and content hash
+      - name: Verify restored database, identity, clients, policies, approvals, audit protection and content hash
         shell: bash
         run: |
           set -euo pipefail
@@ -125,12 +137,18 @@ jobs:
           test "$(query 'select count(*) from identity.role;')" -ge 1
           test "$(query 'select count(*) from identity.role_capability;')" -ge 1
           test "$(query 'select count(*) from identity.human_role_assignment;')" -ge 1
+          test "$(query 'select count(*) from clients.capability;')" -ge 1
+          test "$(query 'select count(*) from clients.grant;')" -ge 1
           test "$(query 'select count(*) from ai.use_case;')" -ge 1
           test "$(query 'select count(*) from ai.use_case_version;')" -ge 1
+          test "$(query 'select count(*) from ai.provider;')" -ge 1
+          test "$(query 'select count(*) from ai.model_route;')" -ge 1
+          test "$(query 'select count(*) from ai.provider_use_case_grant;')" -ge 1
           test "$(query 'select count(*) from automation.action_definition;')" -ge 1
           test "$(query 'select count(*) from automation.action_execution;')" -ge 1
+          test "$(query 'select count(*) from approval.execution_approval;')" -ge 1
           test "$(query 'select count(*) from policy.retention_rule;')" -ge 1
-          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 4
+          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 6
 
           if docker run --rm --network host \
             -e PGPASSWORD="$PGPASSWORD" \
