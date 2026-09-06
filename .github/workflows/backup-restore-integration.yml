@@ -59,6 +59,12 @@ jobs:
           --configuration Release --no-build
           --filter FullyQualifiedName~ClientAccessAdministrationTests.Persistent_client_grant_can_be_authorized_then_revoked_without_code_change
 
+      - name: Seed representative service identity data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~ServiceAccessAdministrationTests.N8n_like_service_identity_uses_own_grant_and_revocation_is_immediate
+
       - name: Seed representative AI automation and retention policy state
         run: >-
           dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
@@ -119,7 +125,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/soulier-content"
           tar -C "$RUNNER_TEMP/soulier-content" -xzf "$RUNNER_TEMP/soulier-content.tar.gz"
 
-      - name: Verify restored database, identity, clients, policies, approvals, audit protection and content hash
+      - name: Verify restored database, identities, clients, policies, approvals, audit protection and content hash
         shell: bash
         run: |
           set -euo pipefail
@@ -137,6 +143,8 @@ jobs:
           test "$(query 'select count(*) from identity.role;')" -ge 1
           test "$(query 'select count(*) from identity.role_capability;')" -ge 1
           test "$(query 'select count(*) from identity.human_role_assignment;')" -ge 1
+          test "$(query 'select count(*) from identity.service_identity;')" -ge 1
+          test "$(query 'select count(*) from identity.service_grant;')" -ge 1
           test "$(query 'select count(*) from clients.capability;')" -ge 1
           test "$(query 'select count(*) from clients.grant;')" -ge 1
           test "$(query 'select count(*) from ai.use_case;')" -ge 1
@@ -148,7 +156,7 @@ jobs:
           test "$(query 'select count(*) from automation.action_execution;')" -ge 1
           test "$(query 'select count(*) from approval.execution_approval;')" -ge 1
           test "$(query 'select count(*) from policy.retention_rule;')" -ge 1
-          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 6
+          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 7
 
           if docker run --rm --network host \
             -e PGPASSWORD="$PGPASSWORD" \
