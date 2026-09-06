@@ -1,6 +1,9 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.Tokens;
+using Soulier.Zentrale.Application;
 
 namespace Soulier.Zentrale.Api;
 
@@ -47,6 +50,10 @@ public static class SoulierAuthentication
     {
         ArgumentNullException.ThrowIfNull(options);
 
+        services.TryAddSingleton<IHumanPrincipalRegistry, DenyAllHumanPrincipalRegistry>();
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAuthorizationHandler, ActiveHumanEnrollmentHandler>());
+
         services
             .AddAuthentication(authentication =>
             {
@@ -80,6 +87,7 @@ public static class SoulierAuthentication
                 policy.AddAuthenticationSchemes(Scheme);
                 policy.RequireAuthenticatedUser();
                 policy.RequireClaim("sub");
+                policy.AddRequirements(new ActiveHumanEnrollmentRequirement());
             });
 
         return services;
