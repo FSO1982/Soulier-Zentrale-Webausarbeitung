@@ -78,6 +78,7 @@ public sealed class PilotKnowledgeReader : IKnowledgeReader
 
     public Task<string?> ReadAsync(
         Guid documentVersionId,
+        string resourceScope,
         int maxChars,
         RequestContext context,
         CancellationToken cancellationToken)
@@ -85,9 +86,11 @@ public sealed class PilotKnowledgeReader : IKnowledgeReader
         cancellationToken.ThrowIfCancellationRequested();
 
         const string content = "Soulier-Zentrale MCP Pilot: Der kontrollierte Wissenszugriff ist erreichbar. Dieser Inhalt ist ausschließlich Testdatenbestand und keine produktive Wissensquelle.";
-        string? result = documentVersionId == PilotMcpProfile.DocumentVersionId
-            ? content[..Math.Min(content.Length, Math.Clamp(maxChars, 1, 8_000))]
-            : null;
+        string? result =
+            documentVersionId == PilotMcpProfile.DocumentVersionId &&
+            string.Equals(resourceScope, PilotMcpProfile.ResourceScope, StringComparison.Ordinal)
+                ? content[..Math.Min(content.Length, Math.Clamp(maxChars, 1, 8_000))]
+                : null;
 
         return Task.FromResult(result);
     }
@@ -105,6 +108,9 @@ public sealed class SoulierKnowledgeTools(
         [Description("Search query.")] string query,
         [Description("Granted Soulier resource scope. For the Gate-3 pilot use soulier:pilot.")] string resourceScope = PilotMcpProfile.ResourceScope)
     {
+        ValidateQuery(query);
+        ValidateScope(resourceScope);
+
         const string capabilityKey = "knowledge.search";
         var nowUtc = DateTimeOffset.UtcNow;
         var correlationId = $"mcp-{Guid.NewGuid():N}";
@@ -152,6 +158,12 @@ public sealed class SoulierKnowledgeTools(
         [Description("Maximum number of characters to return, capped at 8000.")] int maxChars = 4_000,
         [Description("Granted Soulier resource scope. For the Gate-3 pilot use soulier:pilot.")] string resourceScope = PilotMcpProfile.ResourceScope)
     {
+        if (documentVersionId == Guid.Empty)
+            throw new McpException("INVALID_REQUEST: documentVersionId is required.");
+        ValidateScope(resourceScope);
+        if (maxChars is < 1 or > 8_000)
+            throw new McpException("INVALID_REQUEST: maxChars must be between 1 and 8000.");
+
         const string capabilityKey = "knowledge.read";
         var nowUtc = DateTimeOffset.UtcNow;
         var correlationId = $"mcp-{Guid.NewGuid():N}";
@@ -187,10 +199,23 @@ public sealed class SoulierKnowledgeTools(
 
         var content = await knowledgeReader.ReadAsync(
             documentVersionId,
-            Math.Clamp(maxChars, 1, 8_000),
+            resourceScope,
+            maxChars,
             requestContext,
             CancellationToken.None);
 
         return content ?? throw new McpException("RESOURCE_NOT_FOUND");
+    }
+
+    private static void ValidateQuery(string query)
+    {
+        if (string.IsNullOrWhiteSpace(query) || query.Length > 2_000)
+            throw new McpException("INVALID_REQUEST: query must contain 1 to 2000 characters.");
+    }
+
+    private static void ValidateScope(string resourceScope)
+    {
+        if (string.IsNullOrWhiteSpace(resourceScope) || resourceScope.Length > 500)
+            throw new McpException("INVALID_REQUEST: resourceScope must contain 1 to 500 characters.");
     }
 }
