@@ -7,10 +7,13 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 using Soulier.Zentrale.Api;
+using Soulier.Zentrale.Application;
+using Soulier.Zentrale.Domain;
 
 namespace Soulier.Zentrale.Tests;
 
@@ -20,7 +23,7 @@ public sealed class OidcAuthenticationTests
     private static readonly RsaSecurityKey SigningKey = new(SigningRsa) { KeyId = "gate3-oidc-test-key" };
 
     [Fact]
-    public async Task Valid_signed_token_returns_verified_identity()
+    public async Task Valid_signed_token_for_enrolled_active_human_returns_verified_identity()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new OidcFactory();
@@ -36,6 +39,36 @@ public sealed class OidcAuthenticationTests
         Assert.Contains("frank-test", body, StringComparison.Ordinal);
         Assert.Contains("codex-test", body, StringComparison.Ordinal);
         Assert.Contains(SoulierAuthentication.TestingAuthority, body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Valid_signed_token_for_unregistered_human_is_forbidden()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = new OidcFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(subject: "not-enrolled", audience: SoulierAuthentication.TestingAudience));
+
+        using var response = await client.GetAsync("/internal/identity/whoami", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Valid_signed_token_for_disabled_human_is_forbidden()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var factory = new OidcFactory(HumanPrincipalStatus.Disabled);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            CreateToken(subject: "frank-test", audience: SoulierAuthentication.TestingAudience));
+
+        using var response = await client.GetAsync("/internal/identity/whoami", cancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
@@ -126,13 +159,17 @@ public sealed class OidcAuthenticationTests
         });
     }
 
-    private sealed class OidcFactory : WebApplicationFactory<Program>
+    private sealed class OidcFactory(HumanPrincipalStatus frankStatus = HumanPrincipalStatus.Active)
+        : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.ConfigureTestServices(services =>
             {
+                services.RemoveAll<IHumanPrincipalRegistry>();
+                services.AddSingleton<IHumanPrincipalRegistry>(new TestHumanPrincipalRegistry(frankStatus));
+
                 services.PostConfigure<JwtBearerOptions>(SoulierAuthentication.Scheme, options =>
                 {
                     var configuration = new OpenIdConnectConfiguration
@@ -146,6 +183,27 @@ public sealed class OidcAuthenticationTests
                     options.TokenValidationParameters.IssuerSigningKey = SigningKey;
                 });
             });
+        }
+    }
+
+    private sealed class TestHumanPrincipalRegistry(HumanPrincipalStatus status) : IHumanPrincipalRegistry
+    {
+        private readonly HumanPrincipal _frank = new(
+            Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+            "frank-test",
+            "Frank Test",
+            status,
+            new DateTimeOffset(2026, 9, 6, 0, 0, 0, TimeSpan.Zero));
+
+        public Task<HumanPrincipal?> FindByOidcSubjectAsync(
+            string oidcSubject,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult<HumanPrincipal?>(
+                string.Equals(oidcSubject, _frank.OidcSubject, StringComparison.Ordinal)
+                    ? _frank
+                    : null);
         }
     }
 }
