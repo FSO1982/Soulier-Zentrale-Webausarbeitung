@@ -172,6 +172,10 @@ public sealed class McpStreamableHttpTests
             {
                 configuration.AddInMemoryCollection(new Dictionary<string, string?>
                 {
+                    ["ConnectionStrings:Soulier"] = "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused",
+                    ["Soulier:Identity:Oidc:Enabled"] = "true",
+                    ["Soulier:Identity:Oidc:Authority"] = "https://identity.invalid/",
+                    ["Soulier:Identity:Oidc:Audience"] = "soulier-zentrale-test",
                     ["Soulier:Mcp:PilotEnabled"] = "true",
                     ["Soulier:Mcp:PilotToken"] = PilotToken
                 });
