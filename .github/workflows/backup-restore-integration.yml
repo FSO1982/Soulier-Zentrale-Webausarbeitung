@@ -1,0 +1,172 @@
+name: backup-restore-integration
+
+on:
+  push:
+    branches: [main, work/gate3-architecture-skeleton]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backup-restore:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: soulier_test
+          POSTGRES_PASSWORD: soulier_test
+          POSTGRES_DB: soulier_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U soulier_test -d soulier_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SOULIER_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=soulier_test;Username=soulier_test;Password=soulier_test;Include Error Detail=true
+      PGPASSWORD: soulier_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore persistence test project
+        run: dotnet restore tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+
+      - name: Build persistence test project
+        run: dotnet build tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj --configuration Release --no-restore
+
+      - name: Seed application schema and representative data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresPersistenceTests.Initial_migration_applies_and_enforces_core_constraints
+
+      - name: Seed representative human access data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresHumanAccessTests.Human_access_schema_is_persistent_unique_scoped_and_readable
+
+      - name: Seed representative client capability and grant data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~ClientAccessAdministrationTests.Persistent_client_grant_can_be_authorized_then_revoked_without_code_change
+
+      - name: Seed representative service identity data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~ServiceAccessAdministrationTests.N8n_like_service_identity_uses_own_grant_and_revocation_is_immediate
+
+      - name: Seed representative AI automation and retention policy state
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresControlPlanePolicyTests.Control_plane_tables_enforce_active_version_idempotency_and_retention_constraints
+
+      - name: Seed representative provider and approval state
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresProviderApprovalTests.Provider_and_approval_state_enforce_explicit_evidence_and_exact_execution_binding
+
+      - name: Prepare representative content file
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/soulier-content"
+          mkdir -p "$ROOT/sha256/aa"
+          printf '%s' 'Soulier-Zentrale restore proof content' > "$ROOT/sha256/aa/representative"
+          sha256sum "$ROOT/sha256/aa/representative" | awk '{print $1}' > "$RUNNER_TEMP/content.sha256"
+
+      - name: Create PostgreSQL and file backups
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:18 \
+            pg_dump -h 127.0.0.1 -U soulier_test -d soulier_test -Fc -f /backup/soulier-db.dump
+          tar -C "$RUNNER_TEMP/soulier-content" -czf "$RUNNER_TEMP/soulier-content.tar.gz" .
+          sha256sum "$RUNNER_TEMP/soulier-db.dump" "$RUNNER_TEMP/soulier-content.tar.gz"
+          test -s "$RUNNER_TEMP/soulier-db.dump"
+          test -s "$RUNNER_TEMP/soulier-content.tar.gz"
+
+      - name: Destroy test database and content
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:18 \
+            psql -h 127.0.0.1 -U soulier_test -d postgres -v ON_ERROR_STOP=1 \
+            -c 'DROP DATABASE soulier_test WITH (FORCE);' \
+            -c 'CREATE DATABASE soulier_test OWNER soulier_test;'
+          rm -rf "$RUNNER_TEMP/soulier-content"
+          test ! -e "$RUNNER_TEMP/soulier-content"
+
+      - name: Restore PostgreSQL and content
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            -v "$RUNNER_TEMP:/backup" \
+            postgres:18 \
+            pg_restore -h 127.0.0.1 -U soulier_test -d soulier_test --exit-on-error /backup/soulier-db.dump
+          mkdir -p "$RUNNER_TEMP/soulier-content"
+          tar -C "$RUNNER_TEMP/soulier-content" -xzf "$RUNNER_TEMP/soulier-content.tar.gz"
+
+      - name: Verify restored database, identities, clients, policies, approvals, audit protection and content hash
+        shell: bash
+        run: |
+          set -euo pipefail
+          query() {
+            docker run --rm --network host \
+              -e PGPASSWORD="$PGPASSWORD" \
+              postgres:18 \
+              psql -h 127.0.0.1 -U soulier_test -d soulier_test -Atqc "$1"
+          }
+
+          test "$(query 'select count(*) from knowledge.document_version;')" -ge 1
+          test "$(query 'select count(*) from knowledge.release;')" -ge 1
+          test "$(query 'select count(*) from audit.event;')" -ge 1
+          test "$(query 'select count(*) from identity.human_principal;')" -ge 1
+          test "$(query 'select count(*) from identity.role;')" -ge 1
+          test "$(query 'select count(*) from identity.role_capability;')" -ge 1
+          test "$(query 'select count(*) from identity.human_role_assignment;')" -ge 1
+          test "$(query 'select count(*) from identity.service_identity;')" -ge 1
+          test "$(query 'select count(*) from identity.service_grant;')" -ge 1
+          test "$(query 'select count(*) from clients.capability;')" -ge 1
+          test "$(query 'select count(*) from clients.grant;')" -ge 1
+          test "$(query 'select count(*) from ai.use_case;')" -ge 1
+          test "$(query 'select count(*) from ai.use_case_version;')" -ge 1
+          test "$(query 'select count(*) from ai.provider;')" -ge 1
+          test "$(query 'select count(*) from ai.model_route;')" -ge 1
+          test "$(query 'select count(*) from ai.provider_use_case_grant;')" -ge 1
+          test "$(query 'select count(*) from automation.action_definition;')" -ge 1
+          test "$(query 'select count(*) from automation.action_execution;')" -ge 1
+          test "$(query 'select count(*) from approval.execution_approval;')" -ge 1
+          test "$(query 'select count(*) from policy.retention_rule;')" -ge 1
+          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 7
+
+          if docker run --rm --network host \
+            -e PGPASSWORD="$PGPASSWORD" \
+            postgres:18 \
+            psql -h 127.0.0.1 -U soulier_test -d soulier_test -v ON_ERROR_STOP=1 \
+            -c "update audit.event set \"ReasonCode\" = 'tampered-after-restore';"; then
+            echo 'Audit mutation unexpectedly succeeded after restore.' >&2
+            exit 1
+          fi
+
+          EXPECTED="$(cat "$RUNNER_TEMP/content.sha256")"
+          ACTUAL="$(sha256sum "$RUNNER_TEMP/soulier-content/sha256/aa/representative" | awk '{print $1}')"
+          test "$EXPECTED" = "$ACTUAL"

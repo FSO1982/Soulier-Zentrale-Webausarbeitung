@@ -1,0 +1,10 @@
+# Beispiel für Franks lokalen Gate-3-Codex-Pilot.
+# Nicht automatisch aktiv: bei Bedarf als .codex/config.toml übernehmen.
+# KEINEN Tokenwert in diese Datei schreiben.
+
+[mcp_servers.soulier_zentrale]
+url = "http://127.0.0.1:5188/mcp"
+bearer_token_env_var = "SOULIER_MCP_PILOT_TOKEN"
+enabled_tools = ["knowledge_search", "knowledge_read"]
+default_tools_approval_mode = "prompt"
+enabled = true
