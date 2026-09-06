@@ -9,6 +9,8 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
     public DbSet<Capability> Capabilities => Set<Capability>();
     public DbSet<Grant> Grants => Set<Grant>();
     public DbSet<HumanPrincipal> HumanPrincipals => Set<HumanPrincipal>();
+    public DbSet<ServiceIdentity> ServiceIdentities => Set<ServiceIdentity>();
+    public DbSet<ServiceGrant> ServiceGrants => Set<ServiceGrant>();
     public DbSet<RoleDefinition> Roles => Set<RoleDefinition>();
     public DbSet<RoleCapability> RoleCapabilities => Set<RoleCapability>();
     public DbSet<HumanRoleAssignment> HumanRoleAssignments => Set<HumanRoleAssignment>();
@@ -104,6 +106,42 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
             entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
             entity.HasIndex(x => x.OidcSubject).IsUnique();
             entity.HasIndex(x => x.Status);
+        });
+
+        modelBuilder.Entity<ServiceIdentity>(entity =>
+        {
+            entity.ToTable("service_identity", "identity");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
+            entity.HasIndex(x => new { x.Environment, x.Name }).IsUnique();
+            entity.HasIndex(x => x.Status);
+        });
+
+        modelBuilder.Entity<ServiceGrant>(entity =>
+        {
+            entity.ToTable("service_grant", "identity");
+            entity.HasKey(x => new
+            {
+                x.ServiceIdentityId,
+                x.CapabilityKey,
+                x.CapabilityMajorVersion,
+                x.ResourceScope,
+                x.Environment
+            });
+            entity.Property(x => x.CapabilityKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
+            entity.HasOne<ServiceIdentity>()
+                .WithMany()
+                .HasForeignKey(x => x.ServiceIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Capability>()
+                .WithMany()
+                .HasForeignKey(x => new { Key = x.CapabilityKey, MajorVersion = x.CapabilityMajorVersion })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ServiceIdentityId, x.Status });
+            entity.HasIndex(x => new { x.CapabilityKey, x.CapabilityMajorVersion });
         });
 
         modelBuilder.Entity<RoleDefinition>(entity =>
