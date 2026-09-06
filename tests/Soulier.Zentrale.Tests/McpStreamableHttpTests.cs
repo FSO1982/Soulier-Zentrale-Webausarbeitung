@@ -130,7 +130,6 @@ public sealed class McpStreamableHttpTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var factory = new ProductionFactory();
         using var httpClient = factory.CreateClient();
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", PilotToken);
 
         using var mcpRequest = new HttpRequestMessage(HttpMethod.Post, "/mcp")
         {
@@ -168,18 +167,14 @@ public sealed class McpStreamableHttpTests
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Production");
-            builder.ConfigureAppConfiguration((_, configuration) =>
-            {
-                configuration.AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["ConnectionStrings:Soulier"] = "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused",
-                    ["Soulier:Identity:Oidc:Enabled"] = "true",
-                    ["Soulier:Identity:Oidc:Authority"] = "https://identity.invalid/",
-                    ["Soulier:Identity:Oidc:Audience"] = "soulier-zentrale-test",
-                    ["Soulier:Mcp:PilotEnabled"] = "true",
-                    ["Soulier:Mcp:PilotToken"] = PilotToken
-                });
-            });
+            builder.UseSetting(
+                "ConnectionStrings:Soulier",
+                "Host=127.0.0.1;Port=1;Database=unused;Username=unused;Password=unused");
+            builder.UseSetting("Soulier:Identity:Oidc:Enabled", "true");
+            builder.UseSetting("Soulier:Identity:Oidc:Authority", "https://identity.invalid/");
+            builder.UseSetting("Soulier:Identity:Oidc:Audience", "soulier-zentrale-test");
+            builder.UseSetting("Soulier:Mcp:PilotEnabled", "true");
+            builder.UseSetting("Soulier:Mcp:PilotToken", PilotToken);
         }
     }
 }
