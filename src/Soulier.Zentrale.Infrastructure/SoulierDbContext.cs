@@ -6,6 +6,10 @@ namespace Soulier.Zentrale.Infrastructure;
 public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options) : DbContext(options)
 {
     public DbSet<Client> Clients => Set<Client>();
+    public DbSet<HumanPrincipal> HumanPrincipals => Set<HumanPrincipal>();
+    public DbSet<RoleDefinition> Roles => Set<RoleDefinition>();
+    public DbSet<RoleCapability> RoleCapabilities => Set<RoleCapability>();
+    public DbSet<HumanRoleAssignment> HumanRoleAssignments => Set<HumanRoleAssignment>();
     public DbSet<KnowledgeSource> KnowledgeSources => Set<KnowledgeSource>();
     public DbSet<KnowledgeDocument> Documents => Set<KnowledgeDocument>();
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
@@ -45,6 +49,55 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
             entity.HasIndex(x => new { x.Environment, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<HumanPrincipal>(entity =>
+        {
+            entity.ToTable("human_principal", "identity");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.OidcSubject).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.DisplayName).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => x.OidcSubject).IsUnique();
+            entity.HasIndex(x => x.Status);
+        });
+
+        modelBuilder.Entity<RoleDefinition>(entity =>
+        {
+            entity.ToTable("role", "identity");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Key).HasMaxLength(100).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => x.Key).IsUnique();
+        });
+
+        modelBuilder.Entity<RoleCapability>(entity =>
+        {
+            entity.ToTable("role_capability", "identity");
+            entity.HasKey(x => new { x.RoleId, x.CapabilityKey });
+            entity.Property(x => x.CapabilityKey).HasMaxLength(200).IsRequired();
+            entity.HasOne<RoleDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CapabilityKey);
+        });
+
+        modelBuilder.Entity<HumanRoleAssignment>(entity =>
+        {
+            entity.ToTable("human_role_assignment", "identity");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
+            entity.HasOne<HumanPrincipal>()
+                .WithMany()
+                .HasForeignKey(x => x.HumanPrincipalId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<RoleDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.HumanPrincipalId, x.Status });
+            entity.HasIndex(x => x.RoleId);
         });
 
         modelBuilder.Entity<KnowledgeSource>(entity =>
