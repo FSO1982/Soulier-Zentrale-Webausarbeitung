@@ -29,6 +29,18 @@ public sealed record ActionDefinition(
     bool IsActive,
     string? ParameterPolicyVersion);
 
+public sealed record ActionExecutionRecord(
+    Guid Id,
+    string ActionKey,
+    string IdempotencyKey,
+    Guid? ClientId,
+    string ResourceScope,
+    string CorrelationId,
+    PriorExecutionState State,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset? CompletedAtUtc,
+    string? ResultReference);
+
 public sealed record ActionExecutionRequest(
     ActionDefinition Action,
     bool CapabilityAllowed,
