@@ -6,6 +6,8 @@ namespace Soulier.Zentrale.Infrastructure;
 public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options) : DbContext(options)
 {
     public DbSet<Client> Clients => Set<Client>();
+    public DbSet<Capability> Capabilities => Set<Capability>();
+    public DbSet<Grant> Grants => Set<Grant>();
     public DbSet<HumanPrincipal> HumanPrincipals => Set<HumanPrincipal>();
     public DbSet<RoleDefinition> Roles => Set<RoleDefinition>();
     public DbSet<RoleCapability> RoleCapabilities => Set<RoleCapability>();
@@ -58,6 +60,40 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
             entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
             entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
             entity.HasIndex(x => new { x.Environment, x.Name }).IsUnique();
+        });
+
+        modelBuilder.Entity<Capability>(entity =>
+        {
+            entity.ToTable("capability", "clients");
+            entity.HasKey(x => new { x.Key, x.MajorVersion });
+            entity.Property(x => x.Key).HasMaxLength(200).IsRequired();
+            entity.HasIndex(x => x.IsActive);
+        });
+
+        modelBuilder.Entity<Grant>(entity =>
+        {
+            entity.ToTable("grant", "clients");
+            entity.HasKey(x => new
+            {
+                x.ClientId,
+                x.CapabilityKey,
+                x.CapabilityMajorVersion,
+                x.ResourceScope,
+                x.Environment
+            });
+            entity.Property(x => x.CapabilityKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.Environment).HasMaxLength(32).IsRequired();
+            entity.HasOne<Client>()
+                .WithMany()
+                .HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Capability>()
+                .WithMany()
+                .HasForeignKey(x => new { Key = x.CapabilityKey, MajorVersion = x.CapabilityMajorVersion })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ClientId, x.Status });
+            entity.HasIndex(x => new { x.CapabilityKey, x.CapabilityMajorVersion });
         });
 
         modelBuilder.Entity<HumanPrincipal>(entity =>
