@@ -77,6 +77,12 @@ public sealed class PostgresControlPlanePolicyTests
                 ("Category", "RetainFor", "DeletionEnabled", "LegalHoldSupported")
                 values (4, null, true, true)
                 """, cancellationToken));
+
+        await ExecuteAsync(connection, """
+            insert into policy.retention_rule
+            ("Category", "RetainFor", "DeletionEnabled", "LegalHoldSupported")
+            values (3, interval '14 days', true, false)
+            """, cancellationToken);
     }
 
     private static async Task<int> ExecuteAsync(
