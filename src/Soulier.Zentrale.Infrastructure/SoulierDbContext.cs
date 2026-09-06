@@ -16,8 +16,12 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
     public DbSet<KnowledgeRelease> KnowledgeReleases => Set<KnowledgeRelease>();
     public DbSet<AiUseCase> AiUseCases => Set<AiUseCase>();
     public DbSet<AiUseCaseVersion> AiUseCaseVersions => Set<AiUseCaseVersion>();
+    public DbSet<ProviderDefinition> Providers => Set<ProviderDefinition>();
+    public DbSet<ModelRouteDefinition> ModelRoutes => Set<ModelRouteDefinition>();
+    public DbSet<ProviderUseCaseGrant> ProviderUseCaseGrants => Set<ProviderUseCaseGrant>();
     public DbSet<ActionDefinition> ActionDefinitions => Set<ActionDefinition>();
     public DbSet<ActionExecutionRecord> ActionExecutions => Set<ActionExecutionRecord>();
+    public DbSet<ExecutionApproval> ExecutionApprovals => Set<ExecutionApproval>();
     public DbSet<RetentionRule> RetentionRules => Set<RetentionRule>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
@@ -184,6 +188,44 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
                 .HasFilter("\"Status\" = 1");
         });
 
+        modelBuilder.Entity<ProviderDefinition>(entity =>
+        {
+            entity.ToTable("provider", "ai");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(200);
+            entity.HasOne<HumanPrincipal>()
+                .WithMany()
+                .HasForeignKey(x => x.ApprovedByHumanPrincipalId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.Status);
+        });
+
+        modelBuilder.Entity<ModelRouteDefinition>(entity =>
+        {
+            entity.ToTable("model_route", "ai");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(200);
+            entity.Property(x => x.ProviderKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ModelAlias).HasMaxLength(200).IsRequired();
+            entity.HasOne<ProviderDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.ProviderKey)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProviderKey);
+        });
+
+        modelBuilder.Entity<ProviderUseCaseGrant>(entity =>
+        {
+            entity.ToTable("provider_use_case_grant", "ai");
+            entity.HasKey(x => new { x.ProviderKey, x.UseCaseKey });
+            entity.Property(x => x.ProviderKey).HasMaxLength(200);
+            entity.Property(x => x.UseCaseKey).HasMaxLength(200);
+            entity.HasOne<ProviderDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.ProviderKey)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<ActionDefinition>(entity =>
         {
             entity.ToTable("action_definition", "automation");
@@ -208,6 +250,26 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.ActionKey, x.IdempotencyKey }).IsUnique();
             entity.HasIndex(x => x.CorrelationId);
+        });
+
+        modelBuilder.Entity<ExecutionApproval>(entity =>
+        {
+            entity.ToTable("execution_approval", "approval");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActionKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(200).IsRequired();
+            entity.HasOne<ActionDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.ActionKey)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<HumanPrincipal>()
+                .WithMany()
+                .HasForeignKey(x => x.HumanPrincipalId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ActionKey, x.IdempotencyKey })
+                .IsUnique()
+                .HasFilter("\"Status\" = 1");
+            entity.HasIndex(x => x.HumanPrincipalId);
         });
 
         modelBuilder.Entity<RetentionRule>(entity =>
