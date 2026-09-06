@@ -30,6 +30,7 @@ public interface IKnowledgeReader
 
     Task<string?> ReadAsync(
         Guid documentVersionId,
+        string resourceScope,
         int maxChars,
         RequestContext context,
         CancellationToken cancellationToken);
