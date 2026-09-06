@@ -22,7 +22,8 @@ public sealed record Grant(
     string Environment,
     GrantStatus Status,
     DateTimeOffset ValidFromUtc,
-    DateTimeOffset? ValidUntilUtc);
+    DateTimeOffset? ValidUntilUtc,
+    int CapabilityMajorVersion = 1);
 
 public sealed record AuthorizationRequest(
     Client Client,
@@ -51,7 +52,7 @@ public static class CapabilityAuthorizer
         if (request.Client.Status is not ClientStatus.Active)
             return AuthorizationResult.Deny("CLIENT_INACTIVE");
 
-        if (!request.Capability.IsActive)
+        if (!request.Capability.IsActive || request.Capability.MajorVersion < 1)
             return AuthorizationResult.Deny("CAPABILITY_DENIED");
 
         if (request.PolicyDecision is not PolicyDecision.Allow)
@@ -64,6 +65,7 @@ public static class CapabilityAuthorizer
                 g.ClientId == request.Client.Id &&
                 g.Status == GrantStatus.Active &&
                 string.Equals(g.CapabilityKey, request.Capability.Key, StringComparison.Ordinal) &&
+                g.CapabilityMajorVersion == request.Capability.MajorVersion &&
                 g.ValidFromUtc <= request.NowUtc &&
                 (g.ValidUntilUtc is null || g.ValidUntilUtc > request.NowUtc))
             .ToArray();
