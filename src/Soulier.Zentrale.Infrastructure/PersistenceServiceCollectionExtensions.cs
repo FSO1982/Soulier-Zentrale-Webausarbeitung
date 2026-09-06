@@ -30,6 +30,12 @@ public static class PersistenceServiceCollectionExtensions
         services.AddScoped<IClientAccessAdministration>(provider =>
             provider.GetRequiredService<EfClientAccess>());
 
+        services.AddScoped<EfServiceAccess>();
+        services.AddScoped<IServiceAccessReader>(provider =>
+            provider.GetRequiredService<EfServiceAccess>());
+        services.AddScoped<IServiceAccessAdministration>(provider =>
+            provider.GetRequiredService<EfServiceAccess>());
+
         return services;
     }
 }
