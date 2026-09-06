@@ -47,6 +47,12 @@ jobs:
           --configuration Release --no-build
           --filter FullyQualifiedName~PostgresPersistenceTests.Initial_migration_applies_and_enforces_core_constraints
 
+      - name: Seed representative human access data
+        run: >-
+          dotnet test tests/Soulier.Zentrale.Persistence.Tests/Soulier.Zentrale.Persistence.Tests.csproj
+          --configuration Release --no-build
+          --filter FullyQualifiedName~PostgresHumanAccessTests.Human_access_schema_is_persistent_unique_scoped_and_readable
+
       - name: Prepare representative content file
         shell: bash
         run: |
@@ -95,7 +101,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/soulier-content"
           tar -C "$RUNNER_TEMP/soulier-content" -xzf "$RUNNER_TEMP/soulier-content.tar.gz"
 
-      - name: Verify restored database, audit protection and content hash
+      - name: Verify restored database, identity, audit protection and content hash
         shell: bash
         run: |
           set -euo pipefail
@@ -109,7 +115,11 @@ jobs:
           test "$(query 'select count(*) from knowledge.document_version;')" -ge 1
           test "$(query 'select count(*) from knowledge.release;')" -ge 1
           test "$(query 'select count(*) from audit.event;')" -ge 1
-          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 2
+          test "$(query 'select count(*) from identity.human_principal;')" -ge 1
+          test "$(query 'select count(*) from identity.role;')" -ge 1
+          test "$(query 'select count(*) from identity.role_capability;')" -ge 1
+          test "$(query 'select count(*) from identity.human_role_assignment;')" -ge 1
+          test "$(query 'select count(*) from "__EFMigrationsHistory";')" -ge 3
 
           if docker run --rm --network host \
             -e PGPASSWORD="$PGPASSWORD" \
