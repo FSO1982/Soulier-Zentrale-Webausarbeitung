@@ -14,6 +14,11 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
     public DbSet<KnowledgeDocument> Documents => Set<KnowledgeDocument>();
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
     public DbSet<KnowledgeRelease> KnowledgeReleases => Set<KnowledgeRelease>();
+    public DbSet<AiUseCase> AiUseCases => Set<AiUseCase>();
+    public DbSet<AiUseCaseVersion> AiUseCaseVersions => Set<AiUseCaseVersion>();
+    public DbSet<ActionDefinition> ActionDefinitions => Set<ActionDefinition>();
+    public DbSet<ActionExecutionRecord> ActionExecutions => Set<ActionExecutionRecord>();
+    public DbSet<RetentionRule> RetentionRules => Set<RetentionRule>();
     public DbSet<AuditEvent> AuditEvents => Set<AuditEvent>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
@@ -152,6 +157,63 @@ public sealed class SoulierDbContext(DbContextOptions<SoulierDbContext> options)
                 .HasForeignKey(x => x.ClientId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.ClientId, x.ResourceScope, x.UseCaseKey, x.Status });
+        });
+
+        modelBuilder.Entity<AiUseCase>(entity =>
+        {
+            entity.ToTable("use_case", "ai");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Key).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Name).HasMaxLength(250).IsRequired();
+            entity.HasIndex(x => x.Key).IsUnique();
+        });
+
+        modelBuilder.Entity<AiUseCaseVersion>(entity =>
+        {
+            entity.ToTable("use_case_version", "ai");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PromptTemplateHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ModelRouteKey).HasMaxLength(200).IsRequired();
+            entity.HasOne<AiUseCase>()
+                .WithMany()
+                .HasForeignKey(x => x.AiUseCaseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.AiUseCaseId, x.VersionNumber }).IsUnique();
+            entity.HasIndex(x => x.AiUseCaseId)
+                .IsUnique()
+                .HasFilter("\"Status\" = 1");
+        });
+
+        modelBuilder.Entity<ActionDefinition>(entity =>
+        {
+            entity.ToTable("action_definition", "automation");
+            entity.HasKey(x => x.Key);
+            entity.Property(x => x.Key).HasMaxLength(200);
+            entity.Property(x => x.ParameterPolicyVersion).HasMaxLength(100);
+            entity.HasIndex(x => x.Mode);
+        });
+
+        modelBuilder.Entity<ActionExecutionRecord>(entity =>
+        {
+            entity.ToTable("action_execution", "automation");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ActionKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.ResourceScope).HasMaxLength(500).IsRequired();
+            entity.Property(x => x.CorrelationId).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.ResultReference).HasMaxLength(500);
+            entity.HasOne<ActionDefinition>()
+                .WithMany()
+                .HasForeignKey(x => x.ActionKey)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.ActionKey, x.IdempotencyKey }).IsUnique();
+            entity.HasIndex(x => x.CorrelationId);
+        });
+
+        modelBuilder.Entity<RetentionRule>(entity =>
+        {
+            entity.ToTable("retention_rule", "policy");
+            entity.HasKey(x => x.Category);
         });
 
         modelBuilder.Entity<AuditEvent>(entity =>
