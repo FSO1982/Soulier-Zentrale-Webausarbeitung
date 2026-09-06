@@ -30,9 +30,11 @@ if (mcpPilotEnabled)
 
     builder.Services.AddSingleton<PilotMcpProfile>();
     builder.Services.AddSingleton<IKnowledgeReader, PilotKnowledgeReader>();
+    builder.Services.AddSingleton<IKnowledgeDependencyStatusProvider, HealthyPilotKnowledgeDependencyStatusProvider>();
     builder.Services.AddSingleton<InMemoryPilotAuditWriter>();
     builder.Services.AddSingleton<IAuditEventWriter>(sp => sp.GetRequiredService<InMemoryPilotAuditWriter>());
     builder.Services.AddSingleton<AuditedCapabilityAuthorizer>();
+    builder.Services.AddSingleton<AuditedKnowledgeDependencyGuard>();
 
     builder.Services
         .AddMcpServer(options =>
