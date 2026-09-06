@@ -22,6 +22,7 @@ public static class PersistenceServiceCollectionExtensions
             provider.GetRequiredService<EfHumanAccessReader>());
         services.AddScoped<IHumanAccessReader>(provider =>
             provider.GetRequiredService<EfHumanAccessReader>());
+        services.AddScoped<IHumanAccessAdministration, EfHumanAccessAdministration>();
 
         return services;
     }
