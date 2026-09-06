@@ -40,6 +40,14 @@ public sealed class InMemoryPilotAuditWriter : IAuditEventWriter
     }
 }
 
+public sealed class HealthyPilotKnowledgeDependencyStatusProvider : IKnowledgeDependencyStatusProvider
+{
+    public KnowledgeDependencyStatus GetStatus() => new(
+        KnowledgeDependencyState.Healthy,
+        DateTimeOffset.UtcNow,
+        "Gate-3 pilot dependency is an in-process test source.");
+}
+
 public sealed class PilotKnowledgeReader : IKnowledgeReader
 {
     private static readonly KnowledgeSearchHit PilotHit = new(
@@ -89,6 +97,7 @@ public sealed class PilotKnowledgeReader : IKnowledgeReader
 public sealed class SoulierKnowledgeTools(
     IKnowledgeReader knowledgeReader,
     AuditedCapabilityAuthorizer authorizer,
+    AuditedKnowledgeDependencyGuard dependencyGuard,
     PilotMcpProfile profile)
 {
     [McpServerTool(Name = "knowledge_search"), Description("Searches only the explicitly granted Soulier pilot knowledge scope. Internal capability: knowledge.search.")]
@@ -99,7 +108,20 @@ public sealed class SoulierKnowledgeTools(
         const string capabilityKey = "knowledge.search";
         var nowUtc = DateTimeOffset.UtcNow;
         var correlationId = $"mcp-{Guid.NewGuid():N}";
-        var result = await authorizer.AuthorizeAsync(
+        var requestContext = new RequestContext(correlationId, profile.Client.Id, profile.Client.Environment, capabilityKey);
+        var auditContext = new AuthorizationAuditContext(
+            correlationId,
+            null,
+            null,
+            "knowledge_scope",
+            resourceScope,
+            null,
+            null,
+            "mcp-pilot-local-only",
+            null,
+            "mcp");
+
+        var authorization = await authorizer.AuthorizeAsync(
             new AuthorizationRequest(
                 profile.Client,
                 new Capability(capabilityKey, 1, true),
@@ -107,24 +129,18 @@ public sealed class SoulierKnowledgeTools(
                 resourceScope,
                 PolicyDecision.Allow,
                 nowUtc),
-            new AuthorizationAuditContext(
-                correlationId,
-                null,
-                null,
-                "knowledge_scope",
-                resourceScope,
-                null,
-                null,
-                "mcp-pilot-local-only",
-                null,
-                "mcp"));
+            auditContext);
 
-        if (!result.Allowed)
-            throw new McpException($"Access denied: {result.ReasonCode}");
+        if (!authorization.Allowed)
+            throw new McpException($"Access denied: {authorization.ReasonCode}");
+
+        var dependency = await dependencyGuard.EvaluateAsync(requestContext, auditContext, nowUtc);
+        if (!dependency.Allowed)
+            throw new McpException($"Access denied: {dependency.ReasonCode}");
 
         var hits = await knowledgeReader.SearchAsync(
             new KnowledgeSearchRequest(query, resourceScope),
-            new RequestContext(correlationId, profile.Client.Id, profile.Client.Environment, capabilityKey),
+            requestContext,
             CancellationToken.None);
 
         return JsonSerializer.Serialize(hits);
@@ -139,7 +155,20 @@ public sealed class SoulierKnowledgeTools(
         const string capabilityKey = "knowledge.read";
         var nowUtc = DateTimeOffset.UtcNow;
         var correlationId = $"mcp-{Guid.NewGuid():N}";
-        var result = await authorizer.AuthorizeAsync(
+        var requestContext = new RequestContext(correlationId, profile.Client.Id, profile.Client.Environment, capabilityKey);
+        var auditContext = new AuthorizationAuditContext(
+            correlationId,
+            null,
+            null,
+            "document_version",
+            documentVersionId.ToString("D"),
+            documentVersionId,
+            documentVersionId == PilotMcpProfile.DocumentVersionId ? PilotMcpProfile.ContentHash : null,
+            "mcp-pilot-local-only",
+            null,
+            "mcp");
+
+        var authorization = await authorizer.AuthorizeAsync(
             new AuthorizationRequest(
                 profile.Client,
                 new Capability(capabilityKey, 1, true),
@@ -147,25 +176,19 @@ public sealed class SoulierKnowledgeTools(
                 resourceScope,
                 PolicyDecision.Allow,
                 nowUtc),
-            new AuthorizationAuditContext(
-                correlationId,
-                null,
-                null,
-                "document_version",
-                documentVersionId.ToString("D"),
-                documentVersionId,
-                documentVersionId == PilotMcpProfile.DocumentVersionId ? PilotMcpProfile.ContentHash : null,
-                "mcp-pilot-local-only",
-                null,
-                "mcp"));
+            auditContext);
 
-        if (!result.Allowed)
-            throw new McpException($"Access denied: {result.ReasonCode}");
+        if (!authorization.Allowed)
+            throw new McpException($"Access denied: {authorization.ReasonCode}");
+
+        var dependency = await dependencyGuard.EvaluateAsync(requestContext, auditContext, nowUtc);
+        if (!dependency.Allowed)
+            throw new McpException($"Access denied: {dependency.ReasonCode}");
 
         var content = await knowledgeReader.ReadAsync(
             documentVersionId,
             Math.Clamp(maxChars, 1, 8_000),
-            new RequestContext(correlationId, profile.Client.Id, profile.Client.Environment, capabilityKey),
+            requestContext,
             CancellationToken.None);
 
         return content ?? throw new McpException("RESOURCE_NOT_FOUND");
