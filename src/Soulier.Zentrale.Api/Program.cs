@@ -1,12 +1,21 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Protocol;
 using Soulier.Zentrale.Api;
 using Soulier.Zentrale.Application;
 using Soulier.Zentrale.Domain;
+using Soulier.Zentrale.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var databaseConnectionString = SoulierRuntimeConfiguration.ResolveDatabaseConnectionString(
+    builder.Configuration,
+    builder.Environment);
+var databaseConfigured = !string.IsNullOrWhiteSpace(databaseConnectionString);
+if (databaseConfigured)
+    builder.Services.AddSoulierPersistence(databaseConnectionString!);
 
 var oidcOptions = SoulierAuthentication.ResolveOptions(builder.Configuration, builder.Environment);
 if (oidcOptions is not null)
@@ -61,6 +70,42 @@ if (oidcOptions is not null)
 }
 
 app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
+app.MapGet("/health/ready", async Task<IResult> (IServiceProvider services, CancellationToken cancellationToken) =>
+{
+    if (!databaseConfigured)
+        return Results.Json(
+            new { status = "not_ready", reasonCode = "DATABASE_NOT_CONFIGURED" },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+
+    try
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<SoulierDbContext>();
+
+        if (!await db.Database.CanConnectAsync(cancellationToken))
+            return Results.Json(
+                new { status = "not_ready", reasonCode = "DATABASE_UNAVAILABLE" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        var pendingMigrations = await db.Database.GetPendingMigrationsAsync(cancellationToken);
+        if (pendingMigrations.Any())
+            return Results.Json(
+                new { status = "not_ready", reasonCode = "DATABASE_MIGRATIONS_PENDING" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+
+        return Results.Ok(new { status = "ready" });
+    }
+    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    {
+        throw;
+    }
+    catch
+    {
+        return Results.Json(
+            new { status = "not_ready", reasonCode = "DATABASE_CHECK_FAILED" },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+});
 
 if (app.Environment.IsDevelopment() || app.Environment.IsEnvironment("Testing"))
 {
